@@ -1,3 +1,5 @@
+import * as vscode from "vscode";
+
 export async function handleSearch(routes: any, language: string, query: string): Promise<any[]> {
 	const languageRoutes = routes[language];
 	if (!languageRoutes) {
@@ -11,6 +13,7 @@ export async function handleSearch(routes: any, language: string, query: string)
 			results.push(...repoResults);
 		} catch (error) {
 			console.error(`Error searching ${repoName}:`, error);
+			vscode.window.showErrorMessage(`Error searching ${repoName}: ${error}`);
 		}
 	}
 
@@ -21,6 +24,8 @@ export async function handleSearch(routes: any, language: string, query: string)
 
 async function searchRepo(config: any, query: string, repoName: string): Promise<any[]> {
 	try {
+		await new Promise((resolve) => setTimeout(resolve, 200));
+
 		if (repoName === "rubygems") {
 			return await searchRubyGems(query, config);
 		}
@@ -36,18 +41,35 @@ async function searchRepo(config: any, query: string, repoName: string): Promise
 		Object.keys(params).forEach((key) => urlObj.searchParams.append(key, params[key]));
 		const url = urlObj.toString();
 
+		const controller = new AbortController();
+		const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 ثانیه تایم‌اوت
+
 		const response = await fetch(url, {
 			headers: {
 				"User-Agent": "VSCode-Dependency-Viewer/1.0",
 				...(config.headers || {}),
 			},
+			signal: controller.signal,
 		});
 
-		if (!response.ok) return [];
+		clearTimeout(timeoutId);
+
+		if (!response.ok) {
+			console.error(`HTTP error ${response.status}: ${response.statusText}`);
+			return [];
+		}
+
 		const data = await response.json();
 		return parseResults(data, config, repoName);
 	} catch (error) {
-		console.error(`Error in searchRepo for ${repoName}:`, error);
+		if (error instanceof Error) {
+			if (error.name === "AbortError") {
+				console.error(`Request timeout for ${repoName}`);
+				vscode.window.showWarningMessage(`Timeout searching ${repoName}`);
+			} else {
+				console.error(`Error in searchRepo for ${repoName}:`, error);
+			}
+		}
 		return [];
 	}
 }
@@ -55,12 +77,19 @@ async function searchRepo(config: any, query: string, repoName: string): Promise
 async function searchRubyGems(query: string, config: any): Promise<any[]> {
 	try {
 		const url = `https://rubygems.org/api/v1/search.json?query=${encodeURIComponent(query)}`;
+
+		const controller = new AbortController();
+		const timeoutId = setTimeout(() => controller.abort(), 10000);
+
 		const response = await fetch(url, {
 			headers: {
 				"User-Agent": "VSCode-Dependency-Viewer/1.0",
 				Accept: "application/json",
 			},
+			signal: controller.signal,
 		});
+
+		clearTimeout(timeoutId);
 
 		if (!response.ok) return [];
 		const items: any = await response.json();
@@ -79,9 +108,71 @@ async function searchRubyGems(query: string, config: any): Promise<any[]> {
 			};
 		});
 	} catch (error) {
-		console.error("RubyGems search error:", error);
+		if (error instanceof Error && error.name === "AbortError") {
+			console.error("RubyGems request timeout");
+			vscode.window.showWarningMessage("Timeout searching RubyGems");
+		} else {
+			console.error("RubyGems search error:", error);
+		}
 		return [];
 	}
+}
+
+function buildMavenOutput(item: any, repoName: string): { name: string; version: string; formatted: string } {
+	const groupId = item.g || item.groupId || "unknown";
+	const artifactId = item.a || item.artifactId || "unknown";
+	const version = item.latestVersion || item.version || "unknown";
+	const name = groupId + ":" + artifactId;
+	const packaging = item.p || "";
+
+	const isBom = packaging.toLowerCase() === "pom";
+
+	let formatted = "";
+
+	switch (repoName) {
+		case "maven": // Java - Maven XML
+			formatted = "<dependency>\n";
+			formatted += `    <groupId>${groupId}</groupId>\n`;
+			formatted += `    <artifactId>${artifactId}</artifactId>\n`;
+			formatted += `    <version>${version}</version>\n`;
+			if (isBom) {
+				formatted += `    <type>pom</type>\n`;
+			}
+			formatted += "</dependency>";
+			break;
+
+		case "maven-kotlin": // Kotlin - Gradle Kotlin DSL
+			if (isBom) {
+				formatted = `implementation(platform("${groupId}:${artifactId}:${version}"))`;
+			} else {
+				formatted = `implementation("${groupId}:${artifactId}:${version}")`;
+			}
+			break;
+
+		case "maven-groovy": // Groovy - Gradle Groovy DSL
+			if (isBom) {
+				formatted = `implementation platform("${groupId}:${artifactId}:${version}")`;
+			} else {
+				formatted = `implementation '${groupId}:${artifactId}:${version}'`;
+			}
+			break;
+
+		default:
+			formatted = "<dependency>\n";
+			formatted += `    <groupId>${groupId}</groupId>\n`;
+			formatted += `    <artifactId>${artifactId}</artifactId>\n`;
+			formatted += `    <version>${version}</version>\n`;
+			if (isBom) {
+				formatted += `    <type>pom</type>\n`;
+			}
+			formatted += "</dependency>";
+	}
+
+	return {
+		name: name,
+		version: version,
+		formatted: formatted,
+	};
 }
 
 function parseResults(data: any, config: any, repoName: string): any[] {
@@ -102,16 +193,13 @@ function parseResults(data: any, config: any, repoName: string): any[] {
 		pkgVersion = temp || "Unknown";
 
 		let pkgName = "";
-		let formatted = format;
+		let formatted = "";
 
 		if (repoName === "maven" || repoName === "maven-kotlin" || repoName === "maven-groovy") {
-			const g = item.g || item.groupId || "unknown";
-			const a = item.a || item.artifactId || "unknown";
-			pkgName = g + ":" + a;
-			formatted = format
-				.replace(/\{groupId\}/g, g)
-				.replace(/\{artifactId\}/g, a)
-				.replace(/\{version\}/g, pkgVersion);
+			const result = buildMavenOutput(item, repoName);
+			pkgName = result.name;
+			pkgVersion = result.version;
+			formatted = result.formatted;
 		} else if (repoName === "nuget") {
 			pkgName = item.id || item.title || "unknown";
 			formatted = format.replace(/\{name\}/g, pkgName).replace(/\{version\}/g, pkgVersion);
@@ -124,6 +212,9 @@ function parseResults(data: any, config: any, repoName: string): any[] {
 			formatted = format.replace(/\{name\}/g, pkgName).replace(/\{version\}/g, pkgVersion);
 		} else if (repoName === "rubygems") {
 			pkgName = item.name || "unknown";
+			formatted = format.replace(/\{name\}/g, pkgName).replace(/\{version\}/g, pkgVersion);
+		} else {
+			pkgName = item.name || item.id || "unknown";
 			formatted = format.replace(/\{name\}/g, pkgName).replace(/\{version\}/g, pkgVersion);
 		}
 

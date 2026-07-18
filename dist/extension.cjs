@@ -52,11 +52,13 @@ async function handleSearch(routes, language, query) {
 		results.push(...repoResults);
 	} catch (error) {
 		console.error(`Error searching ${repoName}:`, error);
+		vscode.window.showErrorMessage(`Error searching ${repoName}: ${error}`);
 	}
 	return results.filter((item, index, self) => index === self.findIndex((t) => t.name === item.name && t.version === item.version));
 }
 async function searchRepo(config, query, repoName) {
 	try {
+		await new Promise((resolve) => setTimeout(resolve, 200));
 		if (repoName === "rubygems") return await searchRubyGems(query, config);
 		const params = { ...config.params };
 		Object.keys(params).forEach((key) => {
@@ -65,24 +67,42 @@ async function searchRepo(config, query, repoName) {
 		const urlObj = new URL(config.searchUrl);
 		Object.keys(params).forEach((key) => urlObj.searchParams.append(key, params[key]));
 		const url = urlObj.toString();
-		const response = await fetch(url, { headers: {
-			"User-Agent": "VSCode-Dependency-Viewer/1.0",
-			...config.headers || {}
-		} });
-		if (!response.ok) return [];
+		const controller = new AbortController();
+		const timeoutId = setTimeout(() => controller.abort(), 1e4);
+		const response = await fetch(url, {
+			headers: {
+				"User-Agent": "VSCode-Dependency-Viewer/1.0",
+				...config.headers || {}
+			},
+			signal: controller.signal
+		});
+		clearTimeout(timeoutId);
+		if (!response.ok) {
+			console.error(`HTTP error ${response.status}: ${response.statusText}`);
+			return [];
+		}
 		return parseResults(await response.json(), config, repoName);
 	} catch (error) {
-		console.error(`Error in searchRepo for ${repoName}:`, error);
+		if (error instanceof Error) if (error.name === "AbortError") {
+			console.error(`Request timeout for ${repoName}`);
+			vscode.window.showWarningMessage(`Timeout searching ${repoName}`);
+		} else console.error(`Error in searchRepo for ${repoName}:`, error);
 		return [];
 	}
 }
 async function searchRubyGems(query, config) {
 	try {
 		const url = `https://rubygems.org/api/v1/search.json?query=${encodeURIComponent(query)}`;
-		const response = await fetch(url, { headers: {
-			"User-Agent": "VSCode-Dependency-Viewer/1.0",
-			Accept: "application/json"
-		} });
+		const controller = new AbortController();
+		const timeoutId = setTimeout(() => controller.abort(), 1e4);
+		const response = await fetch(url, {
+			headers: {
+				"User-Agent": "VSCode-Dependency-Viewer/1.0",
+				Accept: "application/json"
+			},
+			signal: controller.signal
+		});
+		clearTimeout(timeoutId);
 		if (!response.ok) return [];
 		return (await response.json()).slice(0, 20).map((item) => {
 			const pkgName = item.name || "unknown";
@@ -97,9 +117,50 @@ async function searchRubyGems(query, config) {
 			};
 		});
 	} catch (error) {
-		console.error("RubyGems search error:", error);
+		if (error instanceof Error && error.name === "AbortError") {
+			console.error("RubyGems request timeout");
+			vscode.window.showWarningMessage("Timeout searching RubyGems");
+		} else console.error("RubyGems search error:", error);
 		return [];
 	}
+}
+function buildMavenOutput(item, repoName) {
+	const groupId = item.g || item.groupId || "unknown";
+	const artifactId = item.a || item.artifactId || "unknown";
+	const version = item.latestVersion || item.version || "unknown";
+	const name = groupId + ":" + artifactId;
+	const isBom = (item.p || "").toLowerCase() === "pom";
+	let formatted = "";
+	switch (repoName) {
+		case "maven":
+			formatted = "<dependency>\n";
+			formatted += `    <groupId>${groupId}</groupId>\n`;
+			formatted += `    <artifactId>${artifactId}</artifactId>\n`;
+			formatted += `    <version>${version}</version>\n`;
+			if (isBom) formatted += `    <type>pom</type>\n`;
+			formatted += "</dependency>";
+			break;
+		case "maven-kotlin":
+			if (isBom) formatted = `implementation(platform("${groupId}:${artifactId}:${version}"))`;
+			else formatted = `implementation("${groupId}:${artifactId}:${version}")`;
+			break;
+		case "maven-groovy":
+			if (isBom) formatted = `implementation platform("${groupId}:${artifactId}:${version}")`;
+			else formatted = `implementation '${groupId}:${artifactId}:${version}'`;
+			break;
+		default:
+			formatted = "<dependency>\n";
+			formatted += `    <groupId>${groupId}</groupId>\n`;
+			formatted += `    <artifactId>${artifactId}</artifactId>\n`;
+			formatted += `    <version>${version}</version>\n`;
+			if (isBom) formatted += `    <type>pom</type>\n`;
+			formatted += "</dependency>";
+	}
+	return {
+		name,
+		version,
+		formatted
+	};
 }
 function parseResults(data, config, repoName) {
 	const { items, version, format } = config.parseResponse;
@@ -113,12 +174,12 @@ function parseResults(data, config, repoName) {
 		for (const key of version) temp = temp?.[key];
 		pkgVersion = temp || "Unknown";
 		let pkgName = "";
-		let formatted = format;
+		let formatted = "";
 		if (repoName === "maven" || repoName === "maven-kotlin" || repoName === "maven-groovy") {
-			const g = item.g || item.groupId || "unknown";
-			const a = item.a || item.artifactId || "unknown";
-			pkgName = g + ":" + a;
-			formatted = format.replace(/\{groupId\}/g, g).replace(/\{artifactId\}/g, a).replace(/\{version\}/g, pkgVersion);
+			const result = buildMavenOutput(item, repoName);
+			pkgName = result.name;
+			pkgVersion = result.version;
+			formatted = result.formatted;
 		} else if (repoName === "nuget") {
 			pkgName = item.id || item.title || "unknown";
 			formatted = format.replace(/\{name\}/g, pkgName).replace(/\{version\}/g, pkgVersion);
@@ -131,6 +192,9 @@ function parseResults(data, config, repoName) {
 			formatted = format.replace(/\{name\}/g, pkgName).replace(/\{version\}/g, pkgVersion);
 		} else if (repoName === "rubygems") {
 			pkgName = item.name || "unknown";
+			formatted = format.replace(/\{name\}/g, pkgName).replace(/\{version\}/g, pkgVersion);
+		} else {
+			pkgName = item.name || item.id || "unknown";
 			formatted = format.replace(/\{name\}/g, pkgName).replace(/\{version\}/g, pkgVersion);
 		}
 		return {
