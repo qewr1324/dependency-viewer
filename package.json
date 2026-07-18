@@ -8,7 +8,7 @@
 	"publisher": "GhurbeSABZI",
 	"packageManager": "bun@1.3.14",
 	"author": "GhurbeSABZI <naiad.arts.studio@gmail.com>",
-	"icon": "res/facet-icon-big.png",
+	"icon": "res/dv-icon-big.png",
 	"license": "MIT",
 	"homepage": "https://github.com/qewr1324/dependency-viewer#readme",
 	"repository": {

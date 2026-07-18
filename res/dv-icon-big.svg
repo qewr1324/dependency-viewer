@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+  <!-- Background -->
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#1e1e1e;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#2d2d2d;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="accent" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#4ec9b0;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#569cd6;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+
+  <!-- Rounded rectangle background -->
+  <rect x="8" y="8" width="240" height="240" rx="32" fill="url(#bg)" stroke="#3e3e3e" stroke-width="4"/>
+
+  <!-- Box icon -->
+  <g transform="translate(50, 60)">
+    <!-- Box body -->
+    <rect x="10" y="30" width="136" height="100" rx="8" fill="none" stroke="url(#accent)" stroke-width="6"/>
+    <rect x="10" y="30" width="60" height="100" rx="0" fill="none" stroke="url(#accent)" stroke-width="4" opacity="0.3"/>
+    
+    <!-- Box lid -->
+    <rect x="6" y="18" width="144" height="18" rx="6" fill="url(#accent)"/>
+    
+    <!-- Arrow down -->
+    <g transform="translate(78, 70)" stroke="url(#accent)" stroke-width="5" fill="none" stroke-linecap="round" stroke-linejoin="round">
+      <line x1="0" y1="0" x2="0" y2="24"/>
+      <polyline points="-10,14 0,24 10,14"/>
+    </g>
+  </g>
+
+  <!-- Small dependency dots -->
+  <circle cx="180" cy="100" r="8" fill="#ce9178" opacity="0.8"/>
+  <circle cx="200" cy="130" r="6" fill="#569cd6" opacity="0.8"/>
+  <circle cx="190" cy="160" r="7" fill="#4ec9b0" opacity="0.8"/>
+  <line x1="180" y1="100" x2="200" y2="130" stroke="#ce9178" stroke-width="2" opacity="0.5"/>
+  <line x1="200" y1="130" x2="190" y2="160" stroke="#569cd6" stroke-width="2" opacity="0.5"/>
+</svg>
