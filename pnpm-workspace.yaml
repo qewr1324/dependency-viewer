@@ -3,9 +3,9 @@ shellEmulator: true
 trustPolicy: no-downgrade
 
 packages:
-  - playground
-  - examples/*
+    - playground
+    - examples/*
 onlyBuiltDependencies:
-  - '@vscode/vsce-sign'
-  - esbuild
-  - keytar
+    - "@vscode/vsce-sign"
+    - esbuild
+    - keytar

@@ -24,9 +24,17 @@
 	"keywords": [
 		"dependency",
 		"language dependency",
-		"file",
-		"vscode extension",
-		"developer tools"
+		"package manager",
+		"npm",
+		"maven",
+		"pypi",
+		"nuget",
+		"packagist",
+		"rubygems",
+		"crates",
+		"golang",
+		"pubdev",
+		"swiftpm"
 	],
 	"categories": [
 		"Other"
@@ -44,13 +52,8 @@
 	"contributes": {
 		"commands": [
 			{
-				"command": "dependencyManager.quickPick",
-				"title": "Dependency Viewer: Search Packages",
-				"icon": "$(search)"
-			},
-			{
-				"command": "dependencyManager.searchPackage",
-				"title": "Dependency Viewer: Quick Search",
+				"command": "dependencyManager.openPanel",
+				"title": "Dependency Viewer: Open Panel",
 				"icon": "$(package)"
 			}
 		]
@@ -59,8 +62,8 @@
 		"vscode:prepublish": "bun run build",
 		"compile": "tsc -p ./",
 		"watch": "tsc -watch -p ./",
-		"build": "tsdown src/extension.ts --external vscode",
-		"dev": "bun run build --watch --sourcemap",
+		"build": "tsdown src/extension.ts --external vscode && cp route.json dist/route.json && mkdir -p dist/panel && cp src/panel/webview.html dist/panel/webview.html && cp src/panel/styles.css dist/panel/styles.css && cp src/panel/main.js dist/panel/main.js",
+		"dev": "tsdown src/extension.ts --external vscode --watch --sourcemap",
 		"prepare": "echo 'Skipping update'",
 		"update": "echo 'Skipping vscode-ext-gen'",
 		"lint": "eslint .",
@@ -71,11 +74,10 @@
 		"ext:publish": "vsce publish --no-dependencies"
 	},
 	"devDependencies": {
-		"@types/vscode": "^1.85.0",
-		"@types/node": "^20.0.0",
-		"typescript": "^5.3.0",
 		"@antfu/eslint-config": "^6.7.3",
 		"@antfu/ni": "^28.0.0",
+		"@types/node": "^20.19.43",
+		"@types/vscode": "^1.85.0",
 		"@vscode/vsce": "^3.7.1",
 		"bumpp": "^10.3.2",
 		"eslint": "^9.39.2",
@@ -83,6 +85,7 @@
 		"reactive-vscode": "^1.0.0-beta.2",
 		"taze": "^19.9.2",
 		"tsdown": "^0.19.0-beta.3",
+		"typescript": "^5.3.0",
 		"vite": "^7.3.0",
 		"vitest": "^4.0.16",
 		"vscode-ext-gen": "^1.5.1",

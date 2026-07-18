@@ -32,142 +32,214 @@ path = __toESM(path);
 let fs = require("fs");
 fs = __toESM(fs);
 
-//#region src/extension.ts
-let statusBarItem;
-let currentLanguage = "";
-let routes = {};
-function activate(context) {
-	console.log("🍂 Dependency Viewer activated");
-	const routePath = path.join(context.extensionPath, "dist", "route.json");
-	if (!fs.existsSync(routePath)) {
-		const rootPath = path.join(context.extensionPath, "route.json");
-		if (fs.existsSync(rootPath)) routes = JSON.parse(fs.readFileSync(rootPath, "utf8"));
-	} else routes = JSON.parse(fs.readFileSync(routePath, "utf8"));
-	statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100);
-	statusBarItem.text = "$(package) Dependency Viewer";
-	statusBarItem.tooltip = "Search dependencies";
-	statusBarItem.command = "dependencyManager.quickPick";
-	statusBarItem.show();
-	const quickPickCommand = vscode.commands.registerCommand("dependencyManager.quickPick", async () => {
-		await showLanguagePicker();
-	});
-	const searchCommand = vscode.commands.registerCommand("dependencyManager.searchPackage", async () => {
-		if (!currentLanguage) await showLanguagePicker();
-		if (currentLanguage) await searchAndShowResults();
-	});
-	context.subscriptions.push(statusBarItem, quickPickCommand, searchCommand);
+//#region src/utils.ts
+function loadRoutes(context) {
+	const routePath = path.join(context.extensionPath, "route.json");
+	if (fs.existsSync(routePath)) return JSON.parse(fs.readFileSync(routePath, "utf8"));
+	const distPath = path.join(context.extensionPath, "dist", "route.json");
+	if (fs.existsSync(distPath)) return JSON.parse(fs.readFileSync(distPath, "utf8"));
+	return {};
 }
-async function showLanguagePicker() {
-	const languages = Object.keys(routes);
-	if (languages.length === 0) {
-		vscode.window.showErrorMessage("No languages configured in route.json");
-		return;
-	}
-	const selected = await vscode.window.showQuickPick(languages, {
-		placeHolder: "Select programming language",
-		title: "🍂 Dependency Viewer - Select Language"
-	});
-	if (selected) {
-		currentLanguage = selected;
-		statusBarItem.text = `$(package) ${selected}`;
-		vscode.window.showInformationMessage(`✅ Selected: ${selected}`);
-		await searchAndShowResults();
-	}
-}
-async function searchAndShowResults() {
-	const query = await vscode.window.showInputBox({
-		prompt: `Search ${currentLanguage} packages`,
-		placeHolder: "e.g., spring-boot, react, django",
-		title: "🍂 Search Package"
-	});
-	if (!query) return;
-	await vscode.window.withProgress({
-		location: vscode.ProgressLocation.Notification,
-		title: `Searching "${query}" in ${currentLanguage}...`,
-		cancellable: false
-	}, async () => {
-		try {
-			const results = await searchPackages(currentLanguage, query);
-			if (results.length === 0) {
-				vscode.window.showInformationMessage("No packages found");
-				return;
-			}
-			const items = results.map((pkg) => ({
-				label: `$(symbol-package) ${pkg.name}`,
-				description: `v${pkg.version}`,
-				detail: pkg.description || "",
-				package: pkg
-			}));
-			const selected = await vscode.window.showQuickPick(items, {
-				matchOnDescription: true,
-				matchOnDetail: true,
-				placeHolder: "Select package to copy",
-				title: `📦 ${currentLanguage} Packages - "${query}"`
-			});
-			if (selected) {
-				await vscode.env.clipboard.writeText(selected.package.formatted);
-				vscode.window.showInformationMessage(`📋 ${selected.package.name} copied to clipboard!`);
-			}
-		} catch (error) {
-			vscode.window.showErrorMessage(`Search failed: ${error}`);
-		}
-	});
-}
-async function searchPackages(language, query) {
+
+//#endregion
+//#region src/searchHandlers.ts
+async function handleSearch(routes, language, query) {
 	const languageRoutes = routes[language];
 	if (!languageRoutes) return [];
 	const results = [];
 	for (const [repoName, config] of Object.entries(languageRoutes)) try {
-		const repoResults = await searchRepo(config, query);
+		const repoResults = await searchRepo(config, query, repoName);
 		results.push(...repoResults);
 	} catch (error) {
 		console.error(`Error searching ${repoName}:`, error);
 	}
-	return results;
+	return results.filter((item, index, self) => index === self.findIndex((t) => t.name === item.name && t.version === item.version));
 }
-async function searchRepo(config, query) {
-	const baseUrl = config.searchUrl;
-	const params = { ...config.params };
-	Object.keys(params).forEach((key) => {
-		if (typeof params[key] === "string") params[key] = params[key].replace("${query}", query);
-	});
-	const url = new URL(baseUrl);
-	Object.keys(params).forEach((key) => {
-		url.searchParams.append(key, params[key]);
-	});
-	console.log("Searching URL:", url.toString());
-	const data = await (await fetch(url.toString(), { headers: {
-		"User-Agent": "VSCode-Dependency-Viewer/1.0",
-		...config.headers || {}
-	} })).json();
-	console.log("Response data:", JSON.stringify(data).substring(0, 500));
-	const { items, name, version, format } = config.parseResponse;
+async function searchRepo(config, query, repoName) {
+	try {
+		if (repoName === "rubygems") return await searchRubyGems(query, config);
+		const params = { ...config.params };
+		Object.keys(params).forEach((key) => {
+			if (typeof params[key] === "string") params[key] = params[key].replace("${query}", encodeURIComponent(query));
+		});
+		const urlObj = new URL(config.searchUrl);
+		Object.keys(params).forEach((key) => urlObj.searchParams.append(key, params[key]));
+		const url = urlObj.toString();
+		const response = await fetch(url, { headers: {
+			"User-Agent": "VSCode-Dependency-Viewer/1.0",
+			...config.headers || {}
+		} });
+		if (!response.ok) return [];
+		return parseResults(await response.json(), config, repoName);
+	} catch (error) {
+		console.error(`Error in searchRepo for ${repoName}:`, error);
+		return [];
+	}
+}
+async function searchRubyGems(query, config) {
+	try {
+		const url = `https://rubygems.org/api/v1/search.json?query=${encodeURIComponent(query)}`;
+		const response = await fetch(url, { headers: {
+			"User-Agent": "VSCode-Dependency-Viewer/1.0",
+			Accept: "application/json"
+		} });
+		if (!response.ok) return [];
+		return (await response.json()).slice(0, 20).map((item) => {
+			const pkgName = item.name || "unknown";
+			const pkgVersion = item.version || "unknown";
+			const formatted = config.parseResponse.format.replace(/\{name\}/g, pkgName).replace(/\{version\}/g, pkgVersion);
+			return {
+				name: pkgName,
+				version: pkgVersion,
+				description: item.info || item.description || "",
+				formatted,
+				repoName: config.name || "RubyGems"
+			};
+		});
+	} catch (error) {
+		console.error("RubyGems search error:", error);
+		return [];
+	}
+}
+function parseResults(data, config, repoName) {
+	const { items, version, format } = config.parseResponse;
 	let itemsArray = data;
 	const itemPath = items.split(".");
 	for (const key of itemPath) itemsArray = itemsArray?.[key];
-	if (!Array.isArray(itemsArray)) {
-		console.log("Items array not found, got:", typeof itemsArray);
-		return [];
-	}
-	console.log(`Found ${itemsArray.length} items`);
+	if (!Array.isArray(itemsArray)) return [];
 	return itemsArray.map((item) => {
-		let pkgName = item;
-		for (const key of name) pkgName = pkgName?.[key];
-		let pkgVersion = item;
-		for (const key of version) pkgVersion = pkgVersion?.[key];
+		let pkgVersion = "Unknown";
+		let temp = item;
+		for (const key of version) temp = temp?.[key];
+		pkgVersion = temp || "Unknown";
+		let pkgName = "";
 		let formatted = format;
-		if (item.g && item.a) formatted = formatted.replace("{groupId}", item.g || "").replace("{artifact}", item.a || "").replace("{artifactId}", item.a || "").replace("{version}", pkgVersion || "");
-		else if (pkgName && config.parseResponse.separator && pkgName.includes(config.parseResponse.separator)) {
-			const parts = pkgName.split(config.parseResponse.separator);
-			formatted = formatted.replace("{groupId}", parts[0] || "").replace("{artifact}", parts[1] || "").replace("{artifactId}", parts[1] || "").replace("{version}", pkgVersion || "");
-		} else formatted = formatted.replace("{name}", pkgName || "").replace("{version}", pkgVersion || "");
+		if (repoName === "maven" || repoName === "maven-kotlin" || repoName === "maven-groovy") {
+			const g = item.g || item.groupId || "unknown";
+			const a = item.a || item.artifactId || "unknown";
+			pkgName = g + ":" + a;
+			formatted = format.replace(/\{groupId\}/g, g).replace(/\{artifactId\}/g, a).replace(/\{version\}/g, pkgVersion);
+		} else if (repoName === "nuget") {
+			pkgName = item.id || item.title || "unknown";
+			formatted = format.replace(/\{name\}/g, pkgName).replace(/\{version\}/g, pkgVersion);
+		} else if (repoName === "npm" || repoName === "npm-types") {
+			pkgName = item.package?.name || item.name || "unknown";
+			formatted = format.replace(/\{name\}/g, pkgName).replace(/\{version\}/g, pkgVersion);
+		} else if (repoName === "crates") {
+			pkgName = item.name || item.id || "unknown";
+			pkgVersion = item.max_version || item.version || "unknown";
+			formatted = format.replace(/\{name\}/g, pkgName).replace(/\{version\}/g, pkgVersion);
+		} else if (repoName === "rubygems") {
+			pkgName = item.name || "unknown";
+			formatted = format.replace(/\{name\}/g, pkgName).replace(/\{version\}/g, pkgVersion);
+		}
 		return {
-			name: pkgName || "Unknown",
-			version: pkgVersion || "Unknown",
-			description: item.description || item.summary || "",
-			formatted
+			name: pkgName,
+			version: pkgVersion,
+			description: item.description || item.summary || item.info || item.title || "",
+			formatted,
+			repoName: config.name || repoName
 		};
 	});
+}
+
+//#endregion
+//#region src/DependencyPanel.ts
+var DependencyPanel = class DependencyPanel {
+	static currentPanel;
+	_panel;
+	_context;
+	_disposables = [];
+	static routes = {};
+	static createOrShow(context) {
+		const column = vscode.ViewColumn.Active;
+		if (DependencyPanel.currentPanel) {
+			DependencyPanel.currentPanel._panel.reveal(column);
+			return;
+		}
+		DependencyPanel.routes = loadRoutes(context);
+		DependencyPanel.currentPanel = new DependencyPanel(vscode.window.createWebviewPanel("dependencyViewer", "🍂 Dependency Viewer", column, {
+			enableScripts: true,
+			retainContextWhenHidden: true,
+			localResourceRoots: [vscode.Uri.joinPath(context.extensionUri, "dist", "panel")]
+		}), context);
+	}
+	constructor(panel, context) {
+		this._panel = panel;
+		this._context = context;
+		this._loadWebviewContent();
+		this._setupMessageHandlers();
+		this._panel.onDidDispose(() => this.dispose(), null, this._disposables);
+	}
+	_loadWebviewContent() {
+		const htmlPath = path.join(this._context.extensionPath, "dist", "panel", "webview.html");
+		const cssPath = path.join(this._context.extensionPath, "dist", "panel", "styles.css");
+		const jsPath = path.join(this._context.extensionPath, "dist", "panel", "main.js");
+		if (!fs.existsSync(htmlPath)) {
+			vscode.window.showErrorMessage(`HTML file not found at: ${htmlPath}`);
+			return;
+		}
+		const cssUri = this._panel.webview.asWebviewUri(vscode.Uri.file(cssPath));
+		const jsUri = this._panel.webview.asWebviewUri(vscode.Uri.file(jsPath));
+		let html = fs.readFileSync(htmlPath, "utf8");
+		html = html.replace("${STYLES_CSS}", cssUri.toString());
+		html = html.replace("${MAIN_JS}", jsUri.toString());
+		this._panel.webview.html = html;
+	}
+	_setupMessageHandlers() {
+		this._panel.webview.onDidReceiveMessage(async (message) => {
+			switch (message.command) {
+				case "getLanguages":
+					this._panel.webview.postMessage({
+						command: "setLanguages",
+						languages: Object.keys(DependencyPanel.routes)
+					});
+					break;
+				case "search":
+					try {
+						const results = await handleSearch(DependencyPanel.routes, message.language, message.query);
+						this._panel.webview.postMessage({
+							command: "searchResults",
+							results
+						});
+					} catch (error) {
+						this._panel.webview.postMessage({
+							command: "searchError",
+							error: String(error)
+						});
+					}
+					break;
+				case "copyToClipboard":
+					await vscode.env.clipboard.writeText(message.text);
+					vscode.window.showInformationMessage(`📋 Copied: ${message.name}`);
+					break;
+				case "close":
+					this._panel.dispose();
+					break;
+			}
+		}, null, this._disposables);
+	}
+	dispose() {
+		DependencyPanel.currentPanel = void 0;
+		this._panel.dispose();
+		while (this._disposables.length) this._disposables.pop()?.dispose();
+	}
+};
+
+//#endregion
+//#region src/extension.ts
+let statusBarItem;
+function activate(context) {
+	console.log("🍂 Dependency Viewer activated");
+	statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100);
+	statusBarItem.text = "$(package) Dependency Viewer";
+	statusBarItem.tooltip = "Search and add dependencies";
+	statusBarItem.command = "dependencyManager.openPanel";
+	statusBarItem.show();
+	const openPanelCommand = vscode.commands.registerCommand("dependencyManager.openPanel", () => {
+		DependencyPanel.createOrShow(context);
+	});
+	context.subscriptions.push(statusBarItem, openPanelCommand);
 }
 function deactivate() {}
 

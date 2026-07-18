@@ -1,2 +1,6 @@
-# NodeJs
+# nodejs
 node_modules/
+dist/
+*.vsix
+
+# vscoode

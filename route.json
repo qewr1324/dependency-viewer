@@ -2,7 +2,6 @@
 	"Java": {
 		"maven": {
 			"name": "Maven Central",
-			"icon": "elephant",
 			"searchUrl": "https://search.maven.org/solrsearch/select",
 			"params": {
 				"q": "${query}",
@@ -11,8 +10,6 @@
 			},
 			"parseResponse": {
 				"items": "response.docs",
-				"name": ["id"],
-				"separator": ":",
 				"version": ["latestVersion"],
 				"format": "<dependency>\n    <groupId>{groupId}</groupId>\n    <artifactId>{artifactId}</artifactId>\n    <version>{version}</version>\n</dependency>"
 			}
@@ -21,7 +18,6 @@
 	"JavaScript": {
 		"npm": {
 			"name": "npm Registry",
-			"icon": "json",
 			"searchUrl": "https://registry.npmjs.org/-/v1/search",
 			"params": {
 				"text": "${query}",
@@ -29,29 +25,100 @@
 			},
 			"parseResponse": {
 				"items": "objects",
-				"name": ["package", "name"],
 				"version": ["package", "version"],
 				"format": "\"{name}\": \"^{version}\""
 			}
 		}
 	},
-	"Python": {
-		"pypi": {
-			"name": "PyPI",
-			"icon": "python",
-			"searchUrl": "https://pypi.org/pypi",
+	"TypeScript": {
+		"npm-types": {
+			"name": "npm (@types)",
+			"searchUrl": "https://registry.npmjs.org/-/v1/search",
 			"params": {
-				":action": "search",
-				"term": "${query}"
-			},
-			"headers": {
-				"Accept": "application/json"
+				"text": "@types/${query}",
+				"size": "20"
 			},
 			"parseResponse": {
-				"items": "results",
-				"name": ["name"],
+				"items": "objects",
+				"version": ["package", "version"],
+				"format": "\"{name}\": \"^{version}\""
+			}
+		}
+	},
+	"C#": {
+		"nuget": {
+			"name": "NuGet Gallery",
+			"searchUrl": "https://azuresearch-usnc.nuget.org/query",
+			"params": {
+				"q": "${query}",
+				"take": "20",
+				"prerelease": "false"
+			},
+			"parseResponse": {
+				"items": "data",
 				"version": ["version"],
-				"format": "{name}=={version}"
+				"format": "<PackageReference Include=\"{name}\" Version=\"{version}\" />"
+			}
+		}
+	},
+	"Ruby": {
+		"rubygems": {
+			"name": "RubyGems",
+			"searchUrl": "https://rubygems.org/api/v1/search.json",
+			"params": {
+				"query": "${query}"
+			},
+			"parseResponse": {
+				"items": "root",
+				"version": ["version"],
+				"format": "gem '{name}', '~> {version}'"
+			}
+		}
+	},
+	"Rust": {
+		"crates": {
+			"name": "crates.io",
+			"searchUrl": "https://crates.io/api/v1/crates",
+			"params": {
+				"q": "${query}",
+				"per_page": "20"
+			},
+			"parseResponse": {
+				"items": "crates",
+				"version": ["max_version"],
+				"format": "{name} = \"{version}\""
+			}
+		}
+	},
+	"Kotlin": {
+		"maven-kotlin": {
+			"name": "Maven Central",
+			"searchUrl": "https://search.maven.org/solrsearch/select",
+			"params": {
+				"q": "${query}",
+				"rows": "20",
+				"wt": "json"
+			},
+			"parseResponse": {
+				"items": "response.docs",
+				"version": ["latestVersion"],
+				"format": "implementation(\"{groupId}:{artifactId}:{version}\")"
+			}
+		}
+	},
+	"Groovy": {
+		"maven-groovy": {
+			"name": "Maven Central",
+			"searchUrl": "https://search.maven.org/solrsearch/select",
+			"params": {
+				"q": "${query}",
+				"rows": "20",
+				"wt": "json"
+			},
+			"parseResponse": {
+				"items": "response.docs",
+				"version": ["latestVersion"],
+				"format": "implementation '{groupId}:{artifactId}:{version}'"
 			}
 		}
 	}

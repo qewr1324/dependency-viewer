@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dependency Viewer</title>
+    <link rel="stylesheet" href="${STYLES_CSS}">
+</head>
+
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🍂 Dependency Viewer</h1>
+            <button class="btn btn-primary" onclick="closePanel()"
+                style="background: transparent; border: 2px solid var(--border-color); color: var(--text-primary);">✕
+                Close</button>
+        </div>
+
+        <div class="search-section">
+            <div class="search-controls">
+                <select id="langSelect">
+                    <option value="">Choose Language...</option>
+                </select>
+                <input type="text" id="searchInput" placeholder="Search packages..." disabled />
+                <button class="btn btn-primary" id="searchBtn" disabled>🔍 Search</button>
+            </div>
+        </div>
+
+        <div class="results-section" id="results">
+            <div class="empty-state">
+                <div class="icon">📦</div>
+                <h2>Start Searching</h2>
+                <p>Select a language and search for packages</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="toast-container" id="toastContainer"></div>
+
+    <script src="${MAIN_JS}"></script>
+</body>
+
+</html>
