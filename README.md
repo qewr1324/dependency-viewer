@@ -56,6 +56,16 @@ No more opening browser tabs for Maven Central, npm, NuGet, RubyGems, or crates.
 
 ---
 
+## 🎥 Demo Feature
+
+<div align="center">
+
+![Demo_Feature](https://github.com/qewr1324/dependency-viewer/raw/main/res/feature-review.gif)
+
+</div>
+
+---
+
 ## 🚀 Supported Languages & Registries
 
 | Language      | Registry      | Format                                             |
