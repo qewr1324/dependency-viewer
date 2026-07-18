@@ -9,7 +9,7 @@
   
   <h3>✨ Find, copy, and paste dependencies without leaving your editor ✨</h3>
 
-[![Version](https://img.shields.io/badge/version-1.1.0-blue.svg)](https://github.com/qewr1324/dependency-viewer)
+[![GitHub release](https://img.shields.io/github/v/release/qewr1324/dependency-viewer)](https://github.com/qewr1324/dependency-viewer/releases)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Languages](https://img.shields.io/badge/languages-8-orange.svg)](#supported-languages--registries)
 [![Registries](https://img.shields.io/badge/registries-5-purple.svg)](#supported-languages--registries)

@@ -86,7 +86,7 @@ export class DependencyPanel {
 
 					case "copyToClipboard":
 						await vscode.env.clipboard.writeText(message.text);
-						vscode.window.showInformationMessage(`📋 Copied: ${message.name}`);
+						// vscode.window.showInformationMessage(`📋 Copied: ${message.name}`);
 						break;
 
 					case "close":
