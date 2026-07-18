@@ -231,8 +231,8 @@ var DependencyPanel = class DependencyPanel {
 let statusBarItem;
 function activate(context) {
 	console.log("🍂 Dependency Viewer activated");
-	statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100);
-	statusBarItem.text = "$(package) Dependency Viewer";
+	statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 100);
+	statusBarItem.text = "$(circuit-board) DV";
 	statusBarItem.tooltip = "Search and add dependencies";
 	statusBarItem.command = "dependencyManager.openPanel";
 	statusBarItem.show();

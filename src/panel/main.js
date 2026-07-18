@@ -232,7 +232,8 @@ window.addEventListener("message", function (event) {
 				Kotlin: "🟣",
 				Groovy: "⭐",
 			};
-			option.textContent = (emojis[lang] || "📦") + " " + lang;
+			// option.textContent = (emojis[lang] || "📦") + " " + lang;
+			option.textContent = lang;
 			langSelect.appendChild(option);
 		});
 		const state = vscode.getState();

@@ -6,8 +6,13 @@ let statusBarItem: vscode.StatusBarItem;
 export function activate(context: vscode.ExtensionContext) {
 	console.log("🍂 Dependency Viewer activated");
 
-	statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100);
-	statusBarItem.text = "$(package) Dependency Viewer";
+	// statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100);
+	statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 100);
+
+	// statusBarItem.text = "$(package) Dependency Viewer";
+	// statusBarItem.text = "$(right-panel-show) Dependency Viewer";
+	// statusBarItem.text = "$(package) DV";
+	statusBarItem.text = "$(circuit-board) DV";
 	statusBarItem.tooltip = "Search and add dependencies";
 	statusBarItem.command = "dependencyManager.openPanel";
 	statusBarItem.show();
