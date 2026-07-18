@@ -1,0 +1,58 @@
+{
+	"Java": {
+		"maven": {
+			"name": "Maven Central",
+			"icon": "elephant",
+			"searchUrl": "https://search.maven.org/solrsearch/select",
+			"params": {
+				"q": "${query}",
+				"rows": "20",
+				"wt": "json"
+			},
+			"parseResponse": {
+				"items": "response.docs",
+				"name": ["id"],
+				"separator": ":",
+				"version": ["latestVersion"],
+				"format": "<dependency>\n    <groupId>{groupId}</groupId>\n    <artifactId>{artifactId}</artifactId>\n    <version>{version}</version>\n</dependency>"
+			}
+		}
+	},
+	"JavaScript": {
+		"npm": {
+			"name": "npm Registry",
+			"icon": "json",
+			"searchUrl": "https://registry.npmjs.org/-/v1/search",
+			"params": {
+				"text": "${query}",
+				"size": "20"
+			},
+			"parseResponse": {
+				"items": "objects",
+				"name": ["package", "name"],
+				"version": ["package", "version"],
+				"format": "\"{name}\": \"^{version}\""
+			}
+		}
+	},
+	"Python": {
+		"pypi": {
+			"name": "PyPI",
+			"icon": "python",
+			"searchUrl": "https://pypi.org/pypi",
+			"params": {
+				":action": "search",
+				"term": "${query}"
+			},
+			"headers": {
+				"Accept": "application/json"
+			},
+			"parseResponse": {
+				"items": "results",
+				"name": ["name"],
+				"version": ["version"],
+				"format": "{name}=={version}"
+			}
+		}
+	}
+}
