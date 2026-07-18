@@ -13,4 +13,5 @@ eslint.config.mjs
 node_modules/**
 res/*.mp4
 res/*.gif
-!res/facet-icon-big.png
+res/*.png
+!res/dv-icon-big.png
