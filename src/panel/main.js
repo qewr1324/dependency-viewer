@@ -30,14 +30,14 @@ langSelect.addEventListener("change", function () {
 	}
 });
 
-searchInput.addEventListener("input", function () {
-	clearTimeout(searchTimeout);
-	searchTimeout = setTimeout(doSearch, 400);
-});
+// searchInput.addEventListener("input", function () {
+// 	clearTimeout(searchTimeout);
+// 	searchTimeout = setTimeout(doSearch, 400);
+// });
 
 searchInput.addEventListener("keypress", function (e) {
 	if (e.key === "Enter") {
-		clearTimeout(searchTimeout);
+		e.preventDefault();
 		doSearch();
 	}
 });
@@ -243,7 +243,6 @@ window.addEventListener("message", function (event) {
 			searchInput.disabled = false;
 			searchBtn.disabled = false;
 			if (state.query) searchInput.value = state.query;
-			if (state.results) displayResults(state.results);
 		}
 	} else if (msg.command === "searchResults") {
 		displayResults(msg.results);
